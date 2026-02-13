@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,9 @@ func (ctrl *AvailabilityController) SubmitAvailability(context *gin.Context) {
 	}
 
 	if err := ctrl.availService.SubmitAvailability(context.Request.Context(), eventID, req); err != nil {
+		log.Printf("❌ [SubmitAvailability] Database error: %v", err)
+		log.Printf("❌ [SubmitAvailability] Error type: %T", err)
+		log.Printf("❌ [SubmitAvailability] Request data: %+v", req)
 		handleServiceError(context, err)
 		return
 	}

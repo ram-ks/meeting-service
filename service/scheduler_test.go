@@ -188,6 +188,175 @@ func (m *MockPreferredSlotRepository) Delete(ctx context.Context, id uuid.UUID) 
 }
 
 func TestSchedulerServiceSuite(t *testing.T) {
+	t.Run("GetRecommendations_NoAvailability_AllPreferred_IsBestMatch", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockAvailRepo := new(MockAvailabilityRepository)
+		mockPrefRepo := new(MockPreferredSlotRepository)
+
+		svc := NewSchedulerService(mockEventRepo, mockAvailRepo, mockPrefRepo)
+
+		eventID := uuid.New()
+		slotID := uuid.New()
+		participant1 := uuid.New()
+		participant2 := uuid.New()
+
+		now := time.Date(2026, 2, 13, 10, 0, 0, 0, time.UTC)
+		event := &model.Event{
+			ID: eventID,
+			Participants: []model.Participant{
+				{ID: participant1, Email: "alice@example.com"},
+				{ID: participant2, Email: "bob@example.com"},
+			},
+			ProposedSlots: []model.TimeSlot{
+				{ID: slotID, StartTime: now, EndTime: now.Add(time.Hour)},
+			},
+		}
+
+		// No availability submitted
+		availabilities := []model.Availability{}
+
+		// But all prefer this slot
+		preferredSlots := []model.PreferredSlot{
+			{ID: uuid.New(), Email: "alice@example.com", StartTime: now.Add(-time.Hour), EndTime: now.Add(2 * time.Hour)},
+			{ID: uuid.New(), Email: "bob@example.com", StartTime: now.Add(-time.Hour), EndTime: now.Add(2 * time.Hour)},
+		}
+
+		mockEventRepo.On("GetByID", mock.Anything, eventID).Return(event, nil)
+		mockAvailRepo.On("GetByEventID", mock.Anything, eventID).Return(availabilities, nil)
+		mockPrefRepo.On("GetByEmails", mock.Anything, []string{"alice@example.com", "bob@example.com"}).
+			Return(preferredSlots, nil)
+
+		result, err := svc.GetRecommendations(context.Background(), eventID)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		// ✅ NOT perfect anymore
+		assert.Empty(t, result.PerfectSlots)
+		assert.Len(t, result.BestMatches, 1)
+
+		rec := result.BestMatches[0]
+		assert.Equal(t, 0, rec.AvailableCount)
+		assert.Equal(t, 2, rec.TotalParticipants)
+		assert.Equal(t, float64(0), rec.AvailabilityPercent)
+		assert.Equal(t, 2, rec.PreferredCount)
+		assert.Equal(t, float64(100), rec.PreferredPercent)
+		assert.False(t, rec.IsPerfectMatch)
+
+		mockEventRepo.AssertExpectations(t)
+		mockAvailRepo.AssertExpectations(t)
+		mockPrefRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetRecommendations_AllAvailable_AllPreferred_IsPerfect", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockAvailRepo := new(MockAvailabilityRepository)
+		mockPrefRepo := new(MockPreferredSlotRepository)
+
+		svc := NewSchedulerService(mockEventRepo, mockAvailRepo, mockPrefRepo)
+
+		eventID := uuid.New()
+		slotID := uuid.New()
+		participant1 := uuid.New()
+		participant2 := uuid.New()
+
+		now := time.Date(2026, 2, 13, 10, 0, 0, 0, time.UTC)
+		event := &model.Event{
+			ID: eventID,
+			Participants: []model.Participant{
+				{ID: participant1, Email: "alice@example.com"},
+				{ID: participant2, Email: "bob@example.com"},
+			},
+			ProposedSlots: []model.TimeSlot{
+				{ID: slotID, StartTime: now, EndTime: now.Add(time.Hour)},
+			},
+		}
+
+		// All available
+		availabilities := []model.Availability{
+			{ID: uuid.New(), EventID: eventID, ParticipantID: participant1, SlotID: slotID, Status: model.AvailabilityStatusAvailable},
+			{ID: uuid.New(), EventID: eventID, ParticipantID: participant2, SlotID: slotID, Status: model.AvailabilityStatusAvailable},
+		}
+
+		// All prefer
+		preferredSlots := []model.PreferredSlot{
+			{ID: uuid.New(), Email: "alice@example.com", StartTime: now.Add(-time.Hour), EndTime: now.Add(2 * time.Hour)},
+			{ID: uuid.New(), Email: "bob@example.com", StartTime: now.Add(-time.Hour), EndTime: now.Add(2 * time.Hour)},
+		}
+
+		mockEventRepo.On("GetByID", mock.Anything, eventID).Return(event, nil)
+		mockAvailRepo.On("GetByEventID", mock.Anything, eventID).Return(availabilities, nil)
+		mockPrefRepo.On("GetByEmails", mock.Anything, mock.Anything).Return(preferredSlots, nil)
+
+		result, err := svc.GetRecommendations(context.Background(), eventID)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		// Perfect: 100% available AND 100% preferred
+		assert.Len(t, result.PerfectSlots, 1)
+		assert.Empty(t, result.BestMatches)
+		assert.Equal(t, 2, result.PerfectSlots[0].AvailableCount)
+		assert.Equal(t, 2, result.PerfectSlots[0].TotalParticipants)
+		assert.Equal(t, float64(100), result.PerfectSlots[0].AvailabilityPercent)
+		assert.Equal(t, 2, result.PerfectSlots[0].PreferredCount)
+		assert.Equal(t, float64(100), result.PerfectSlots[0].PreferredPercent)
+		assert.True(t, result.PerfectSlots[0].IsPerfectMatch)
+
+		mockEventRepo.AssertExpectations(t)
+		mockAvailRepo.AssertExpectations(t)
+		mockPrefRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetRecommendations_AllAvailable_NoPreferred_NotPerfect", func(t *testing.T) {
+		mockEventRepo := new(MockEventRepository)
+		mockAvailRepo := new(MockAvailabilityRepository)
+		mockPrefRepo := new(MockPreferredSlotRepository)
+
+		svc := NewSchedulerService(mockEventRepo, mockAvailRepo, mockPrefRepo)
+
+		eventID := uuid.New()
+		slotID := uuid.New()
+		participant1 := uuid.New()
+		participant2 := uuid.New()
+
+		now := time.Now()
+		event := &model.Event{
+			ID: eventID,
+			Participants: []model.Participant{
+				{ID: participant1, Email: "alice@example.com"},
+				{ID: participant2, Email: "bob@example.com"},
+			},
+			ProposedSlots: []model.TimeSlot{
+				{ID: slotID, StartTime: now, EndTime: now.Add(time.Hour)},
+			},
+		}
+
+		availabilities := []model.Availability{
+			{ID: uuid.New(), EventID: eventID, ParticipantID: participant1, SlotID: slotID, Status: model.AvailabilityStatusAvailable},
+			{ID: uuid.New(), EventID: eventID, ParticipantID: participant2, SlotID: slotID, Status: model.AvailabilityStatusAvailable},
+		}
+
+		mockEventRepo.On("GetByID", mock.Anything, eventID).Return(event, nil)
+		mockAvailRepo.On("GetByEventID", mock.Anything, eventID).Return(availabilities, nil)
+		mockPrefRepo.On("GetByEmails", mock.Anything, mock.Anything).Return([]model.PreferredSlot{}, nil)
+
+		result, err := svc.GetRecommendations(context.Background(), eventID)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Empty(t, result.PerfectSlots)
+		assert.Len(t, result.BestMatches, 1)
+		assert.Equal(t, 2, result.BestMatches[0].AvailableCount)
+		assert.Equal(t, 2, result.BestMatches[0].TotalParticipants)
+		assert.Equal(t, float64(100), result.BestMatches[0].AvailabilityPercent)
+		assert.Equal(t, 0, result.BestMatches[0].PreferredCount)
+		assert.False(t, result.BestMatches[0].IsPerfectMatch)
+
+		mockEventRepo.AssertExpectations(t)
+		mockAvailRepo.AssertExpectations(t)
+		mockPrefRepo.AssertExpectations(t)
+	})
+
 	t.Run("GetRecommendations_EventNotFound", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockAvailRepo := new(MockAvailabilityRepository)
@@ -329,55 +498,6 @@ func TestSchedulerServiceSuite(t *testing.T) {
 		mockPrefRepo.AssertExpectations(t)
 	})
 
-	t.Run("GetRecommendations_PerfectMatch", func(t *testing.T) {
-		mockEventRepo := new(MockEventRepository)
-		mockAvailRepo := new(MockAvailabilityRepository)
-		mockPrefRepo := new(MockPreferredSlotRepository)
-
-		svc := NewSchedulerService(mockEventRepo, mockAvailRepo, mockPrefRepo)
-
-		eventID := uuid.New()
-		slotID := uuid.New()
-		participant1 := uuid.New()
-		participant2 := uuid.New()
-
-		now := time.Now()
-		event := &model.Event{
-			ID: eventID,
-			Participants: []model.Participant{
-				{ID: participant1, Email: "alice@example.com"},
-				{ID: participant2, Email: "bob@example.com"},
-			},
-			ProposedSlots: []model.TimeSlot{
-				{ID: slotID, StartTime: now, EndTime: now.Add(time.Hour)},
-			},
-		}
-
-		availabilities := []model.Availability{
-			{ID: uuid.New(), EventID: eventID, ParticipantID: participant1, SlotID: slotID, Status: model.AvailabilityStatusAvailable},
-			{ID: uuid.New(), EventID: eventID, ParticipantID: participant2, SlotID: slotID, Status: model.AvailabilityStatusAvailable},
-		}
-
-		mockEventRepo.On("GetByID", mock.Anything, eventID).Return(event, nil)
-		mockAvailRepo.On("GetByEventID", mock.Anything, eventID).Return(availabilities, nil)
-		mockPrefRepo.On("GetByEmails", mock.Anything, mock.Anything).Return([]model.PreferredSlot{}, nil)
-
-		result, err := svc.GetRecommendations(context.Background(), eventID)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, result)
-		assert.Len(t, result.PerfectSlots, 1)
-		assert.Empty(t, result.BestMatches)
-		assert.Equal(t, 2, result.PerfectSlots[0].AvailableCount)
-		assert.Equal(t, 2, result.PerfectSlots[0].TotalParticipants)
-		assert.Equal(t, float64(100), result.PerfectSlots[0].AvailabilityPercent)
-		assert.True(t, result.PerfectSlots[0].IsPerfectMatch)
-
-		mockEventRepo.AssertExpectations(t)
-		mockAvailRepo.AssertExpectations(t)
-		mockPrefRepo.AssertExpectations(t)
-	})
-
 	t.Run("GetRecommendations_PartialStatusCountsAsAvailable", func(t *testing.T) {
 		mockEventRepo := new(MockEventRepository)
 		mockAvailRepo := new(MockAvailabilityRepository)
@@ -407,15 +527,24 @@ func TestSchedulerServiceSuite(t *testing.T) {
 			{ID: uuid.New(), EventID: eventID, ParticipantID: participant2, SlotID: slotID, Status: model.AvailabilityStatusPartial},
 		}
 
+		// ADD THIS: Preferred slots for both participants
+		preferredSlots := []model.PreferredSlot{
+			{ID: uuid.New(), Email: "alice@example.com", StartTime: now.Add(-time.Hour), EndTime: now.Add(2 * time.Hour)},
+			{ID: uuid.New(), Email: "bob@example.com", StartTime: now.Add(-time.Hour), EndTime: now.Add(2 * time.Hour)},
+		}
+
 		mockEventRepo.On("GetByID", mock.Anything, eventID).Return(event, nil)
 		mockAvailRepo.On("GetByEventID", mock.Anything, eventID).Return(availabilities, nil)
-		mockPrefRepo.On("GetByEmails", mock.Anything, mock.Anything).Return([]model.PreferredSlot{}, nil)
+		// CHANGE THIS LINE:
+		mockPrefRepo.On("GetByEmails", mock.Anything, mock.Anything).Return(preferredSlots, nil)
+		// FROM: mockPrefRepo.On("GetByEmails", mock.Anything, mock.Anything).Return([]model.PreferredSlot{}, nil)
 
 		result, err := svc.GetRecommendations(context.Background(), eventID)
 
 		assert.NoError(t, err)
-		assert.Len(t, result.PerfectSlots, 1)
+		assert.Len(t, result.PerfectSlots, 1) // Changed from checking just availability
 		assert.Equal(t, 2, result.PerfectSlots[0].AvailableCount)
+		assert.Equal(t, 2, result.PerfectSlots[0].PreferredCount) // Added
 		assert.True(t, result.PerfectSlots[0].IsPerfectMatch)
 
 		mockEventRepo.AssertExpectations(t)
@@ -505,9 +634,13 @@ func TestSchedulerServiceSuite(t *testing.T) {
 		result, err := svc.GetRecommendations(context.Background(), eventID)
 
 		assert.NoError(t, err)
-		assert.Len(t, result.PerfectSlots, 1)
-		assert.Equal(t, 0, result.PerfectSlots[0].PreferredCount)
-		assert.Equal(t, float64(0), result.PerfectSlots[0].PreferredPercent)
+
+		assert.Empty(t, result.PerfectSlots)
+		assert.Len(t, result.BestMatches, 1)
+
+		assert.Equal(t, 0, result.BestMatches[0].PreferredCount)
+		assert.Equal(t, float64(0), result.BestMatches[0].PreferredPercent)
+		assert.False(t, result.BestMatches[0].IsPerfectMatch)
 
 		mockEventRepo.AssertExpectations(t)
 		mockAvailRepo.AssertExpectations(t)
@@ -548,8 +681,11 @@ func TestSchedulerServiceSuite(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Len(t, result.PerfectSlots, 1)
-		assert.Equal(t, 0, result.PerfectSlots[0].PreferredCount)
+		assert.Empty(t, result.PerfectSlots)
+		assert.Len(t, result.BestMatches, 1)
+
+		assert.Equal(t, 0, result.BestMatches[0].PreferredCount)
+		assert.False(t, result.BestMatches[0].IsPerfectMatch)
 
 		mockEventRepo.AssertExpectations(t)
 		mockAvailRepo.AssertExpectations(t)
@@ -602,11 +738,11 @@ func TestSchedulerServiceSuite(t *testing.T) {
 		result, err := svc.GetRecommendations(context.Background(), eventID)
 
 		assert.NoError(t, err)
-		assert.Len(t, result.PerfectSlots, 1)
-		assert.Len(t, result.BestMatches, 2)
+		assert.Empty(t, result.PerfectSlots)
+		assert.Len(t, result.BestMatches, 3)
 
-		assert.Equal(t, slotID3, result.PerfectSlots[0].SlotID)
-		assert.True(t, result.PerfectSlots[0].IsPerfectMatch)
+		// slot3 should still be best because highest availability (100%)
+		assert.Equal(t, slotID3, result.BestMatches[0].SlotID)
 
 		assert.Greater(t, result.BestMatches[0].AvailabilityPercent, result.BestMatches[1].AvailabilityPercent)
 
@@ -754,8 +890,13 @@ func TestSchedulerServiceSuite(t *testing.T) {
 		result, err := svc.GetRecommendations(context.Background(), eventID)
 
 		assert.NoError(t, err)
-		assert.Len(t, result.PerfectSlots, 1)
-		assert.Equal(t, 0, result.PerfectSlots[0].PreferredCount)
+
+		assert.Empty(t, result.PerfectSlots)
+		assert.Len(t, result.BestMatches, 1)
+
+		assert.Equal(t, 0, result.BestMatches[0].PreferredCount)
+		assert.Equal(t, float64(0), result.BestMatches[0].PreferredPercent)
+		assert.False(t, result.BestMatches[0].IsPerfectMatch)
 
 		mockEventRepo.AssertExpectations(t)
 		mockAvailRepo.AssertExpectations(t)

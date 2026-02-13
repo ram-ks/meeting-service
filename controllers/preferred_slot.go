@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,9 @@ func (ctrl *PreferredSlotController) CreatePreferredSlot(c *gin.Context) {
 
 	slot, err := ctrl.service.Create(c.Request.Context(), req)
 	if err != nil {
+		log.Printf("❌ [CreateSlot] Database error: %v", err)
+		log.Printf("❌ [CreateSlot] Error type: %T", err)
+		log.Printf("❌ [CreateSlot] Request data: %+v", req)
 		handlePreferredSlotError(c, err)
 		return
 	}

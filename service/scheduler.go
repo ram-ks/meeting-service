@@ -98,6 +98,14 @@ func (s *schedulerService) GetRecommendations(ctx context.Context, eventID uuid.
 			preferredPercent = float64(preferredCount) / float64(totalParticipants) * 100
 		}
 
+		isPerfect := false
+
+		if totalParticipants > 0 {
+			isPerfect =
+				availableCount == totalParticipants &&
+					preferredCount == totalParticipants
+		}
+
 		rec := model.Recommendation{
 			SlotID:              slot.ID,
 			Slot:                slot,
@@ -106,7 +114,7 @@ func (s *schedulerService) GetRecommendations(ctx context.Context, eventID uuid.
 			AvailabilityPercent: percent,
 			PreferredCount:      preferredCount,
 			PreferredPercent:    preferredPercent,
-			IsPerfectMatch:      availableCount == totalParticipants && totalParticipants > 0,
+			IsPerfectMatch:      isPerfect,
 		}
 		recommendations = append(recommendations, rec)
 	}
