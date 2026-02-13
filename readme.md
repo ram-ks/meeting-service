@@ -1,4 +1,4 @@
-## Running Service
+## Running Service locally
 ### Start the service
 `docker compose up --build`
 
@@ -42,5 +42,8 @@ service -> scheduler.go
 This has entire recommendation logic
 
 ## Other
+### Open API Spec
+Can be tested locally via `http://localhost:8081`
+
 ### Tech stack:
 Go, Postgres
