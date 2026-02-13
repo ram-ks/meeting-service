@@ -68,11 +68,11 @@ func (r *eventRepository) Create(ctx context.Context, event *model.Event) error 
 
 	for _, participant := range event.Participants {
 		participantQuery := `
-			INSERT INTO participants (id, event_id, user_id, email, name, status, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO participants (id, event_id, email, name, status, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
 		`
 		_, err = tx.ExecContext(ctx, participantQuery,
-			participant.ID, event.ID, participant.UserID, participant.Email,
+			participant.ID, event.ID, participant.Email,
 			participant.Name, participant.Status, participant.CreatedAt,
 		)
 		if err != nil {
@@ -222,11 +222,11 @@ func (r *eventRepository) DeleteSlot(ctx context.Context, id uuid.UUID) error {
 
 func (r *eventRepository) CreateParticipant(ctx context.Context, participant *model.Participant) error {
 	query := `
-		INSERT INTO participants (id, event_id, user_id, email, name, status, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO participants (id, event_id, email, name, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		participant.ID, participant.EventID, participant.UserID,
+		participant.ID, participant.EventID,
 		participant.Email, participant.Name, participant.Status, participant.CreatedAt,
 	)
 	return err
@@ -234,7 +234,7 @@ func (r *eventRepository) CreateParticipant(ctx context.Context, participant *mo
 
 func (r *eventRepository) GetParticipantsByEventID(ctx context.Context, eventID uuid.UUID) ([]model.Participant, error) {
 	query := `
-		SELECT id, event_id, user_id, email, name, status, created_at
+		SELECT id, event_id, email, name, status, created_at
 		FROM participants WHERE event_id = $1
 	`
 	rows, err := r.db.QueryContext(ctx, query, eventID)
@@ -246,7 +246,7 @@ func (r *eventRepository) GetParticipantsByEventID(ctx context.Context, eventID 
 	var participants []model.Participant
 	for rows.Next() {
 		var p model.Participant
-		err := rows.Scan(&p.ID, &p.EventID, &p.UserID, &p.Email, &p.Name, &p.Status, &p.CreatedAt)
+		err := rows.Scan(&p.ID, &p.EventID, &p.Email, &p.Name, &p.Status, &p.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -257,12 +257,12 @@ func (r *eventRepository) GetParticipantsByEventID(ctx context.Context, eventID 
 
 func (r *eventRepository) GetParticipantByID(ctx context.Context, id uuid.UUID) (*model.Participant, error) {
 	query := `
-		SELECT id, event_id, user_id, email, name, status, created_at
+		SELECT id, event_id, email, name, status, created_at
 		FROM participants WHERE id = $1
 	`
 	p := &model.Participant{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&p.ID, &p.EventID, &p.UserID, &p.Email, &p.Name, &p.Status, &p.CreatedAt,
+		&p.ID, &p.EventID, &p.Email, &p.Name, &p.Status, &p.CreatedAt,
 	)
 	if err != nil {
 		return nil, err

@@ -34,7 +34,6 @@ type TimeSlot struct {
 type Participant struct {
 	ID        uuid.UUID         `json:"id"`
 	EventID   uuid.UUID         `json:"event_id"`
-	UserID    *uuid.UUID        `json:"user_id,omitempty"` //TODO: remove, not needed. also from implementation
 	Email     string            `json:"email"`
 	Name      string            `json:"name"`
 	Status    ParticipantStatus `json:"status"`

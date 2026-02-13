@@ -106,8 +106,12 @@ func main() {
 	availabilityService := service.NewAvailabilityService(availabilityRepo, eventRepo)
 	availabilityCtrl := controllers.NewAvailabilityController(availabilityService)
 
-	schedulerService := service.NewSchedulerService(eventRepo, availabilityRepo)
+	preferredSlotRepo := repository.NewPreferredSlotRepository(db)
+	preferredSlotService := service.NewPreferredSlotService(preferredSlotRepo)
+
+	schedulerService := service.NewSchedulerService(eventRepo, availabilityRepo, preferredSlotRepo)
 	recommendationCtrl := controllers.NewRecommendationController(schedulerService)
+	preferredSlotCtrl := controllers.NewPreferredSlotController(preferredSlotService)
 
 	router := gin.Default()
 
@@ -130,6 +134,14 @@ func main() {
 			availability.PUT("/:availability_id", availabilityCtrl.UpdateAvailability)
 			availability.DELETE("/:availability_id", availabilityCtrl.DeleteAvailability)
 		}
+	}
+
+	preferredSlots := router.Group("/preferred-slots")
+	{
+		preferredSlots.POST("", preferredSlotCtrl.CreatePreferredSlot)
+		preferredSlots.GET("/email/:email", preferredSlotCtrl.GetPreferredSlotsByEmail)
+		preferredSlots.PUT("/:id", preferredSlotCtrl.UpdatePreferredSlot)
+		preferredSlots.DELETE("/:id", preferredSlotCtrl.DeletePreferredSlot)
 	}
 
 	log.Println("🚀 Server starting...")

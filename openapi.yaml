@@ -1,0 +1,1000 @@
+openapi: 3.0.3
+info:
+  title: Meeting Service API
+  description: API for scheduling meetings with participant availability tracking and slot recommendations
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check the health status of the service and database connection
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /events:
+    post:
+      summary: Create a new event
+      description: Create a new meeting event with proposed time slots and participants
+      operationId: createEvent
+      tags:
+        - Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List events
+      description: List all events for the current organizer
+      operationId: listEvents
+      tags:
+        - Events
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}:
+    get:
+      summary: Get event by ID
+      description: Retrieve a specific event with its slots and participants
+      operationId: getEvent
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Invalid event ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update event
+      description: Update an existing event (only allowed for draft/open events)
+      operationId: updateEvent
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Event updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Invalid event status for this operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete event
+      description: Delete an event and all associated data
+      operationId: deleteEvent
+      tags:
+        - Events
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '204':
+          description: Event deleted successfully
+        '400':
+          description: Invalid event ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}/recommendations:
+    get:
+      summary: Get slot recommendations
+      description: Get recommended time slots based on participant availability
+      operationId: getRecommendations
+      tags:
+        - Recommendations
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Slot recommendations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+        '400':
+          description: Invalid event ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}/availability:
+    post:
+      summary: Submit availability
+      description: Submit participant availability for event time slots
+      operationId: submitAvailability
+      tags:
+        - Availability
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAvailabilityRequest'
+      responses:
+        '200':
+          description: Availability submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: availability submitted successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event or participant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: Get all availability for event
+      description: Get availability submissions from all participants for an event
+      operationId: getAvailability
+      tags:
+        - Availability
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: List of availability records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  availabilities:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Availability'
+        '400':
+          description: Invalid event ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}/availability/{participant_id}:
+    get:
+      summary: Get participant availability
+      description: Get availability for a specific participant
+      operationId: getParticipantAvailability
+      tags:
+        - Availability
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/ParticipantId'
+      responses:
+        '200':
+          description: Participant availability records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  availabilities:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Availability'
+        '400':
+          description: Invalid event or participant ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Event or participant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{id}/availability/{availability_id}:
+    put:
+      summary: Update availability
+      description: Update an existing availability record
+      operationId: updateAvailability
+      tags:
+        - Availability
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/AvailabilityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAvailabilityRequest'
+      responses:
+        '200':
+          description: Availability updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Availability not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete availability
+      description: Delete an availability record
+      operationId: deleteAvailability
+      tags:
+        - Availability
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - $ref: '#/components/parameters/AvailabilityId'
+      responses:
+        '204':
+          description: Availability deleted successfully
+        '400':
+          description: Invalid availability ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Availability not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /preferred-slots:
+    post:
+      summary: Create preferred slot
+      description: Create a new preferred time slot for a user (identified by email)
+      operationId: createPreferredSlot
+      tags:
+        - Preferred Slots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePreferredSlotRequest'
+      responses:
+        '201':
+          description: Preferred slot created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferredSlot'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /preferred-slots/email/{email}:
+    get:
+      summary: Get preferred slots by email
+      description: Get all preferred time slots for a user by their email address
+      operationId: getPreferredSlotsByEmail
+      tags:
+        - Preferred Slots
+      parameters:
+        - name: email
+          in: path
+          required: true
+          description: User email address
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: List of preferred slots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  preferred_slots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PreferredSlot'
+        '400':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /preferred-slots/{id}:
+    put:
+      summary: Update preferred slot
+      description: Update an existing preferred time slot
+      operationId: updatePreferredSlot
+      tags:
+        - Preferred Slots
+      parameters:
+        - $ref: '#/components/parameters/PreferredSlotId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferredSlotRequest'
+      responses:
+        '200':
+          description: Preferred slot updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferredSlot'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Preferred slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete preferred slot
+      description: Delete a preferred time slot
+      operationId: deletePreferredSlot
+      tags:
+        - Preferred Slots
+      parameters:
+        - $ref: '#/components/parameters/PreferredSlotId'
+      responses:
+        '204':
+          description: Preferred slot deleted successfully
+        '400':
+          description: Invalid slot ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Preferred slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    EventId:
+      name: id
+      in: path
+      required: true
+      description: Event UUID
+      schema:
+        type: string
+        format: uuid
+
+    ParticipantId:
+      name: participant_id
+      in: path
+      required: true
+      description: Participant UUID
+      schema:
+        type: string
+        format: uuid
+
+    AvailabilityId:
+      name: availability_id
+      in: path
+      required: true
+      description: Availability UUID
+      schema:
+        type: string
+        format: uuid
+
+    PreferredSlotId:
+      name: id
+      in: path
+      required: true
+      description: Preferred Slot UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        database:
+          type: string
+        error:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        organizer_id:
+          type: string
+          format: uuid
+        duration:
+          type: string
+          description: Duration of the meeting (e.g., "1h", "30m")
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        finalized_slot_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        proposed_slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimeSlot'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Participant'
+
+    EventStatus:
+      type: string
+      enum: [draft, open, finalized, cancelled]
+
+    TimeSlot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+          description: IANA timezone identifier (e.g., "America/New_York")
+        created_at:
+          type: string
+          format: date-time
+
+    Participant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ParticipantStatus'
+        created_at:
+          type: string
+          format: date-time
+
+    ParticipantStatus:
+      type: string
+      enum: [pending, responded, declined]
+
+    Availability:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        participant_id:
+          type: string
+          format: uuid
+        slot_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AvailabilityStatus'
+        available_from:
+          type: string
+          format: date-time
+          nullable: true
+        available_to:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AvailabilityStatus:
+      type: string
+      enum: [available, unavailable, partial]
+
+    Recommendation:
+      type: object
+      properties:
+        slot_id:
+          type: string
+          format: uuid
+        slot:
+          $ref: '#/components/schemas/TimeSlot'
+        available_count:
+          type: integer
+          description: Number of participants available for this slot
+        total_participants:
+          type: integer
+          description: Total number of participants in the event
+        availability_percent:
+          type: number
+          format: double
+          description: Percentage of participants available (0-100)
+        preferred_count:
+          type: integer
+          description: Number of participants whose preferred slots overlap with this slot
+        preferred_percent:
+          type: number
+          format: double
+          description: Percentage of participants who prefer this slot (0-100)
+        is_perfect_match:
+          type: boolean
+          description: True if all participants are available
+
+    RecommendationResponse:
+      type: object
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        perfect_slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recommendation'
+          description: Slots where all participants are available
+        best_matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recommendation'
+          description: Slots sorted by availability percentage
+
+    CreateEventRequest:
+      type: object
+      required:
+        - title
+        - duration
+        - proposed_slots
+        - participants
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        duration:
+          type: string
+          description: Duration of the meeting (e.g., "1h", "30m")
+        proposed_slots:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateSlotRequest'
+        participants:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateParticipantRequest'
+
+    CreateSlotRequest:
+      type: object
+      required:
+        - start_time
+        - end_time
+        - timezone
+      properties:
+        start_time:
+          type: string
+          description: Start time in format "2006-01-02T15:04:05" or RFC3339
+        end_time:
+          type: string
+          description: End time in format "2006-01-02T15:04:05" or RFC3339
+        timezone:
+          type: string
+          description: IANA timezone identifier (e.g., "America/New_York")
+
+    CreateParticipantRequest:
+      type: object
+      required:
+        - email
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+
+    UpdateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        duration:
+          type: string
+
+    SubmitAvailabilityRequest:
+      type: object
+      required:
+        - participant_id
+        - slots
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+        slots:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/SlotAvailabilityRequest'
+
+    SlotAvailabilityRequest:
+      type: object
+      required:
+        - slot_id
+        - status
+      properties:
+        slot_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AvailabilityStatus'
+        available_from:
+          type: string
+          description: Start of partial availability window
+        available_to:
+          type: string
+          description: End of partial availability window
+
+    UpdateAvailabilityRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/AvailabilityStatus'
+        available_from:
+          type: string
+          description: Start of partial availability window
+        available_to:
+          type: string
+          description: End of partial availability window
+
+    PreferredSlot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+          description: IANA timezone identifier (e.g., "America/New_York")
+        day_of_week:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: Day of week (0=Sunday, 6=Saturday). If set, slot applies only on this day.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreatePreferredSlotRequest:
+      type: object
+      required:
+        - email
+        - start_time
+        - end_time
+        - timezone
+      properties:
+        email:
+          type: string
+          format: email
+        start_time:
+          type: string
+          description: Start time in format "2006-01-02T15:04:05" or RFC3339
+        end_time:
+          type: string
+          description: End time in format "2006-01-02T15:04:05" or RFC3339
+        timezone:
+          type: string
+          description: IANA timezone identifier (e.g., "America/New_York")
+        day_of_week:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: Day of week (0=Sunday, 6=Saturday). If set, slot applies only on this day.
+
+    UpdatePreferredSlotRequest:
+      type: object
+      properties:
+        start_time:
+          type: string
+          description: Start time in format "2006-01-02T15:04:05" or RFC3339
+        end_time:
+          type: string
+          description: End time in format "2006-01-02T15:04:05" or RFC3339
+        timezone:
+          type: string
+          description: IANA timezone identifier (e.g., "America/New_York")
+        day_of_week:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: Day of week (0=Sunday, 6=Saturday). If set, slot applies only on this day.
+
+tags:
+  - name: Health
+    description: Service health endpoints
+  - name: Events
+    description: Event management endpoints
+  - name: Availability
+    description: Participant availability endpoints
+  - name: Preferred Slots
+    description: Participant preferred time slots endpoints
+  - name: Recommendations
+    description: Slot recommendation endpoints

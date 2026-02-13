@@ -8,6 +8,8 @@ type Recommendation struct {
 	AvailableCount      int       `json:"available_count"`
 	TotalParticipants   int       `json:"total_participants"`
 	AvailabilityPercent float64   `json:"availability_percent"`
+	PreferredCount      int       `json:"preferred_count"`
+	PreferredPercent    float64   `json:"preferred_percent"`
 	IsPerfectMatch      bool      `json:"is_perfect_match"`
 }
 
