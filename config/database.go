@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	_ "github.com/lib/pq"
 )
@@ -12,7 +13,11 @@ var db *sql.DB
 
 func ConnectDatabase() {
 	var err error
-	dbURL := "postgres://postgres:postgres@localhost:5433/meeting_scheduler?sslmode=disable"
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL not set")
+	}
+
 	db, err = sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)

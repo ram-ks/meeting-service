@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -65,6 +66,7 @@ func parseTime(timeStr, timezone string) (time.Time, error) {
 func (ctrl *EventController) CreateEvent(context *gin.Context) {
 	var req models.CreateEventRequest
 	if err := context.ShouldBindJSON(&req); err != nil {
+		log.Printf("❌ [CreateEvent] Failed to parse request body: %v", err)
 		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -117,11 +119,14 @@ func (ctrl *EventController) CreateEvent(context *gin.Context) {
 	}
 
 	if err := ctrl.repo.Create(context.Request.Context(), event); err != nil {
-		fmt.Println("Error in inserting value in DB")
+		log.Printf("❌ [CreateEvent] Database error: %v", err)
+		log.Printf("❌ [CreateEvent] Error type: %T", err)
+		log.Printf("❌ [CreateEvent] Request data: %+v", req)
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create item"})
 		return
 	}
 
+	log.Printf("✅ [CreateEvent] Successfully created event: %s", event.ID)
 	context.JSON(http.StatusCreated, event)
 }
 
