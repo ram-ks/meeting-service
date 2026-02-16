@@ -1,3 +1,9 @@
+## Docs
+In docs folder, have added sample APIs with mock data
+This also contains sequence diagram of entire flow.
+
+Please find it docs -> api-example.md and docs -> flow.md
+
 ## Running Service locally
 ### Start the service
 `docker compose up --build`
